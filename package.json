@@ -29,6 +29,3 @@
     "eslint-config-next": "14.2.3"
   }
 }
-"scripts": {
-  "start": "node index.js"
-}
