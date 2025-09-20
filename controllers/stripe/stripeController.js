@@ -1,9 +1,14 @@
 import Stripe from 'stripe';
-import { supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAdmin } from '../lib/supabaseClient';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Create a payment intent
 export const createPaymentIntent = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
     const { amount, accountId, userId, description } = req.body;
 
@@ -11,7 +16,7 @@ export const createPaymentIntent = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Verify account belongs to user
+    // Verify the account belongs to the user
     const { data: account, error: accountError } = await supabaseAdmin
       .from('accounts')
       .select('*')
@@ -31,18 +36,13 @@ export const createPaymentIntent = async (req, res) => {
 
     // Create Stripe payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(parseFloat(amount) * 100), // cents
+      amount: Math.round(parseFloat(amount) * 100),
       currency: 'usd',
-      metadata: {
-        accountId,
-        userId,
-        description: description || 'Account deposit',
-        type: 'deposit'
-      },
+      metadata: { accountId, userId, description: description || 'Account deposit', type: 'deposit' },
       description: `Deposit to account ${account.account_number}`,
     });
 
-    // Store pending transaction
+    // Record pending transaction
     const { error: transactionError } = await supabaseAdmin
       .from('transactions')
       .insert({
@@ -53,14 +53,17 @@ export const createPaymentIntent = async (req, res) => {
         description: description || 'Account deposit',
         status: 'pending',
         stripe_payment_intent_id: paymentIntent.id,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
 
-    if (transactionError) throw transactionError;
+    if (transactionError) {
+      console.error('Error creating transaction record:', transactionError);
+      return res.status(500).json({ error: 'Failed to create transaction record' });
+    }
 
     res.status(200).json({
       clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
     });
 
   } catch (error) {
