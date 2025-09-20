@@ -10,21 +10,31 @@ dotenv.config();
 
 import { ENV } from './config/env.js';
 
-// Import routes
+// ------------------------
+// Import Routes
+// ------------------------
 import authRoutes from './routes/auth.js';
 import cardsRoutes from './routes/cards.js';
 import accountsRoutes from './routes/accounts.js';
 import transactionsRoutes from './routes/transactions.js';
 import adminRoutes from './routes/admin.js';
-import stripeRoutes from './routes/stripe.js'; // <--- new
+import stripeRoutes from './routes/stripe.js';
+import usersRoutes from './routes/users.js'; // For transferFunds, transaction history
 
-// Import controllers
+// ------------------------
+// Import Controllers
+// ------------------------
 import { handleStripeWebhook } from './controllers/stripe/stripeWebhookController.js';
 
-// Middleware
+// ------------------------
+// Import Middleware
+// ------------------------
 import { errorHandler } from './middleware/errorHandler.js';
 import { verifyToken } from './middleware/authMiddleware.js';
 
+// ------------------------
+// Initialize App
+// ------------------------
 const app = express();
 
 // ------------------------
@@ -38,7 +48,7 @@ app.use(cors({
 }));
 
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
+  windowMs: 1 * 60 * 1000, // 1 minute
   max: 100,
   message: 'Too many requests from this IP, please try again later.'
 });
@@ -72,6 +82,7 @@ app.use('/api/accounts', verifyToken, accountsRoutes);
 app.use('/api/transactions', verifyToken, transactionsRoutes);
 app.use('/api/admin', verifyToken, adminRoutes);
 app.use('/api/stripe', verifyToken, stripeRoutes); // All Stripe endpoints except webhook
+app.use('/api/users', verifyToken, usersRoutes);   // Users & account operations
 
 // ------------------------
 // Stripe Webhook (must use raw body)
