@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import bodyParser from 'body-parser'; // Needed for Stripe webhook
 dotenv.config();
 
 import { ENV } from './config/env.js';
@@ -15,6 +16,10 @@ import cardsRoutes from './routes/cards.js';
 import accountsRoutes from './routes/accounts.js';
 import transactionsRoutes from './routes/transactions.js';
 import adminRoutes from './routes/admin.js';
+import stripeRoutes from './routes/stripe.js'; // <--- new
+
+// Import controllers
+import { handleStripeWebhook } from './controllers/stripe/stripeWebhookController.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -25,14 +30,13 @@ const app = express();
 // ------------------------
 // Security & Performance
 // ------------------------
-app.use(helmet()); // Secure HTTP headers
+app.use(helmet());
 
 app.use(cors({
   origin: ENV.NEXT_PUBLIC_SITE_URL || '*',
   credentials: true
 }));
 
-// Rate limiter: max 100 requests per minute per IP
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 100,
@@ -40,10 +44,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Request logging
 app.use(morgan('combined'));
 
+// ------------------------
 // Body parsing
+// ------------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -61,11 +66,21 @@ app.get('/health', (req, res) => {
 // ------------------------
 // API Routes
 // ------------------------
-app.use('/api/auth', authRoutes);                    // Public auth routes
-app.use('/api/cards', verifyToken, cardsRoutes);    // Protected card routes
-app.use('/api/accounts', verifyToken, accountsRoutes); // Protected account routes
-app.use('/api/transactions', verifyToken, transactionsRoutes); // Protected transaction routes
-app.use('/api/admin', verifyToken, adminRoutes);    // Admin-only routes
+app.use('/api/auth', authRoutes);
+app.use('/api/cards', verifyToken, cardsRoutes);
+app.use('/api/accounts', verifyToken, accountsRoutes);
+app.use('/api/transactions', verifyToken, transactionsRoutes);
+app.use('/api/admin', verifyToken, adminRoutes);
+app.use('/api/stripe', verifyToken, stripeRoutes); // All Stripe endpoints except webhook
+
+// ------------------------
+// Stripe Webhook (must use raw body)
+// ------------------------
+app.post(
+  '/api/stripe/webhook',
+  bodyParser.raw({ type: 'application/json' }),
+  handleStripeWebhook
+);
 
 // ------------------------
 // 404 Not Found Handler
