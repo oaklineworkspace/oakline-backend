@@ -11,16 +11,18 @@ const supabase = createClient(
 // =====================
 export const getAccountTypes = async (req, res) => {
   try {
-    // Run a raw SQL query to get all values from the enum
-    const { data, error } = await supabase
-      .rpc('get_account_types'); // We'll create a PostgreSQL function next
+    // Call PostgreSQL function to fetch all account types
+    const { data, error } = await supabase.rpc('get_account_types');
 
     if (error) {
       console.error('Error fetching account types:', error);
       return res.status(500).json({ error: 'Failed to fetch account types' });
     }
 
-    res.status(200).json({ accountTypes: data });
+    // Convert to plain array of strings
+    const accountTypes = data.map(item => item.get_account_types);
+
+    res.status(200).json({ accountTypes });
   } catch (err) {
     console.error('Server error fetching account types:', err);
     res.status(500).json({ error: err.message || 'Server error' });
